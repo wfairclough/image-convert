@@ -1,86 +1,52 @@
 package main
 
 import (
-	"fmt"
-	"image"
-	"os"
-	"time"
-  "path/filepath"
+	"context"
+	"log"
 
-	"github.com/sunshineplan/imgconv"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-type OutputSize int
-
-func (s OutputSize) String() string {
-  switch s {
-  case XXLarge:
-    return "xxl"
-  case XLarge:
-    return "xl"
-  case Large:
-    return "lg"
-  case Medium:
-    return "md"
-  case Small:
-    return "sm"
-  case XSmall:
-    return "xs"
-  default:
-    return "unknown"
-  }
-}
-
-func (s OutputSize) Width() int {
-  return int(s)
-}
-
-func (s OutputSize) Values() []OutputSize {
-  return []OutputSize{XXLarge, XLarge, Large, Medium, Small, XSmall}
-}
-
-const (
-	XXLarge OutputSize = 3840
-	XLarge  OutputSize = 1920
-	Large   OutputSize = 1280
-	Medium  OutputSize = 640
-	Small   OutputSize = 320
-	XSmall  OutputSize = 200
+var (
+	invokeCount int
+	myObjects   []types.Object
 )
+
+func init() {
+	// Load the SDK configuration
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		log.Fatalf("Unable to load SDK config: %v", err)
+	}
+
+	// Initialize an S3 client
+	svc := s3.NewFromConfig(cfg)
+
+	// Define the bucket name as a variable so we can take its address
+	bucketName := "examplebucket"
+	input := &s3.ListObjectsV2Input{
+		Bucket: &bucketName,
+	}
+
+	// List objects in the bucket
+	result, err := svc.ListObjectsV2(context.TODO(), input)
+	if err != nil {
+		log.Fatalf("Failed to list objects: %v", err)
+	}
+	myObjects = result.Contents
+}
+
+func LambdaHandler(ctx context.Context) (int, error) {
+	invokeCount++
+	for i, obj := range myObjects {
+		log.Printf("object[%d] size: %d key: %s", i, obj.Size, *obj.Key)
+	}
+	return invokeCount, nil
+}
 
 func main() {
-	src, err := imgconv.Open("testdata/living.jpg")
-	if err != nil {
-		fmt.Println(err)
-	}
-
-  err = write_image(src, XXLarge, imgconv.PDF)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-  for _, size := range XXLarge.Values() {
-    err = write_image(src, size, imgconv.JPEG)
-    if err != nil {
-      fmt.Println(err)
-    }
-  }
-}
-
-func write_image(src image.Image, size OutputSize, format imgconv.Format) error {
-  timestamp := time.Now().Format("200601021504")
-  output_path := filepath.Join("output", fmt.Sprintf("living-%s-%s.%s", size.String(), timestamp, format.String()))
-  file_writer, _ := os.Create(output_path)
-  return imgconv.Write(file_writer, resize(src, size), &imgconv.FormatOption{Format: format})
-}
-
-func resize(src image.Image, size OutputSize) image.Image {
-	width := int(size)
-	img_size := src.Bounds()
-	if img_size.Dx() < int(size) {
-		width = img_size.Dx()
-	}
-	height := width * img_size.Dy() / img_size.Dx()
-
-	return imgconv.Resize(src, &imgconv.ResizeOption{Width: width, Height: height})
+	lambda.Start(LambdaHandler)
 }

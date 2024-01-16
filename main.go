@@ -5,11 +5,39 @@ import (
 	"image"
 	"os"
 	"time"
+  "path/filepath"
 
 	"github.com/sunshineplan/imgconv"
 )
 
 type OutputSize int
+
+func (s OutputSize) String() string {
+  switch s {
+  case XXLarge:
+    return "xxl"
+  case XLarge:
+    return "xl"
+  case Large:
+    return "lg"
+  case Medium:
+    return "md"
+  case Small:
+    return "sm"
+  case XSmall:
+    return "xs"
+  default:
+    return "unknown"
+  }
+}
+
+func (s OutputSize) Width() int {
+  return int(s)
+}
+
+func (s OutputSize) Values() []OutputSize {
+  return []OutputSize{XXLarge, XLarge, Large, Medium, Small, XSmall}
+}
 
 const (
 	XXLarge OutputSize = 3840
@@ -21,34 +49,29 @@ const (
 )
 
 func main() {
-	// Read image from file
 	src, err := imgconv.Open("testdata/living.jpg")
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	timestamp := time.Now().Format("20060102150405")
-
-	file_writer, _ := os.Create(fmt.Sprintf("output/living-org-%s.pdf", timestamp))
-	err = imgconv.Write(file_writer, src, &imgconv.FormatOption{Format: imgconv.PDF})
+  err = write_image(src, XXLarge, imgconv.PDF)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	file_writer, _ = os.Create(fmt.Sprintf("output/living-xl-%s.jpg", timestamp))
-	err = imgconv.Write(file_writer, resize(src, XLarge), &imgconv.FormatOption{Format: imgconv.JPEG})
+  for _, size := range XXLarge.Values() {
+    err = write_image(src, size, imgconv.JPEG)
+    if err != nil {
+      fmt.Println(err)
+    }
+  }
+}
 
-	file_writer, _ = os.Create(fmt.Sprintf("output/living-lg-%s.jpg", timestamp))
-	err = imgconv.Write(file_writer, resize(src, Large), &imgconv.FormatOption{Format: imgconv.JPEG})
-
-	file_writer, _ = os.Create(fmt.Sprintf("output/living-md-%s.jpg", timestamp))
-	err = imgconv.Write(file_writer, resize(src, Medium), &imgconv.FormatOption{Format: imgconv.JPEG})
-
-	file_writer, _ = os.Create(fmt.Sprintf("output/living-sm-%s.jpg", timestamp))
-	err = imgconv.Write(file_writer, resize(src, Small), &imgconv.FormatOption{Format: imgconv.JPEG})
-
-	file_writer, _ = os.Create(fmt.Sprintf("output/living-xs-%s.jpg", timestamp))
-	err = imgconv.Write(file_writer, resize(src, XSmall), &imgconv.FormatOption{Format: imgconv.JPEG})
+func write_image(src image.Image, size OutputSize, format imgconv.Format) error {
+  timestamp := time.Now().Format("200601021504")
+  output_path := filepath.Join("output", fmt.Sprintf("living-%s-%s.%s", size.String(), timestamp, format.String()))
+  file_writer, _ := os.Create(output_path)
+  return imgconv.Write(file_writer, resize(src, size), &imgconv.FormatOption{Format: format})
 }
 
 func resize(src image.Image, size OutputSize) image.Image {

@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
-	"log"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
+	"github.com/sirupsen/logrus"
 )
+
+var log *logrus.Logger
 
 var (
 	invokeCount int
@@ -16,6 +20,12 @@ var (
 )
 
 func init() {
+
+	log = logrus.New()
+	log.SetFormatter(&logrus.JSONFormatter{})
+  
+  log.Info("Initializing Lambda")
+
 	// Load the SDK configuration
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ca-central-1"))
 	if err != nil {
@@ -37,13 +47,22 @@ func init() {
 		log.Fatalf("Failed to list objects: %v", err)
 	}
 	myObjects = result.Contents
+  log.Info("Objects listed")
 }
 
-func LambdaHandler(ctx context.Context) (int, error) {
+func LambdaHandler(ctx context.Context, event events.S3Event) (int, error) {
+  log.Info("Lambda invoked")
+
+  // log the event as json 
+  log.WithFields(logrus.Fields{
+    "event": event,
+  }).Info("Lambda invoked")
+
 	invokeCount++
 	for i, obj := range myObjects {
 		log.Printf("object[%d] size: %d key: %s", i, obj.Size, *obj.Key)
 	}
+  log.Info("Lambda completed")
 	return invokeCount, nil
 }
 

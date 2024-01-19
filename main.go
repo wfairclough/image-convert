@@ -53,7 +53,6 @@ func init() {
 func LambdaHandler(ctx context.Context, event events.S3Event) (int, error) {
   log.Info("Lambda invoked")
 
-  // log the event as json 
   log.WithFields(logrus.Fields{
     "event": event,
   }).Info("Lambda invoked")
